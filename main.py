@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import json
 import os
 import time
@@ -22,9 +23,9 @@ class Handler():
         self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
         self.client.tls_set()
 
+         
         
-        
-        self.lcd = LcdBackpack('/dev/ttyACM0', 115200)
+        self.lcd = LcdBackpack('/dev/serial/by-id/usb-239a_Adafruit_Industries-if00', 115200)
         self.lcd.connect()
         self.lcd.clear()
         self.reset_backlight()
@@ -109,7 +110,7 @@ class Handler():
 
 
     def reset_backlight(self):
-        self.lcd.set_backlight_rgb(255, 255, 0)
+        self.lcd.set_backlight_rgb(255, 255, 255)
 
 
     def display_msg(self, title, msg, alert=False):

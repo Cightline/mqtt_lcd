@@ -1,0 +1,13 @@
+[Unit]
+Description=MQTT LCD 
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/mqtt_lcd
+PIDFile=/var/run/mqtt_lcd.pid
+ExecStart=/home/admin/mqtt_lcd/main.py
+
+[Install]
+WantedBy=multi-user.target
