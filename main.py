@@ -30,7 +30,7 @@ class Handler():
         self.lcd.clear()
         self.reset_backlight()
         self.lcd.set_autoscroll(False)
-        self.lcd.set_splash_screen('TEST FUCK', 16*2)
+        self.lcd.set_splash_screen('Starting up', 16*2)
         self.lcd.write('waiting...')
         self.buffer = ['','']
 
