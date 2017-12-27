@@ -11,7 +11,7 @@ from lcdbackpack import LcdBackpack
 
 class Handler():
     def __init__(self):
-        self.config_path = os.path.expanduser('~/.config/mqtt_lcd/config.json')
+        self.config_path = os.path.expanduser('~/.config/mqtt/publish.json')
         self.config      = self.load_config()
         self.msg_queue   = []
         self.client      = mqtt.Client()
