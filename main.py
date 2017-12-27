@@ -110,7 +110,7 @@ class Handler():
 
 
     def reset_backlight(self):
-        self.lcd.set_backlight_rgb(255, 255, 255)
+        self.lcd.set_backlight_rgb(100, 100, 100)
 
 
     def display_msg(self, title, msg, alert=False):
