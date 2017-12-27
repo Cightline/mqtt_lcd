@@ -1,0 +1,3 @@
+pip install requests
+pip install gdax
+pip install pushbullet.py

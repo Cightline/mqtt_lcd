@@ -7,7 +7,7 @@ from mqtt_publish import Publisher
 
 class Weather():
     def __init__(self):
-        with open(os.path.expanduser('~/.config/mqtt_weather/config.json'), 'r') as cfg:
+        with open(os.path.expanduser('~/.config/mqtt/weather.json'), 'r') as cfg:
             self.config = json.load(cfg)
 
 

@@ -2,7 +2,6 @@ import os
 import json
 import requests
 
-from pushbullet   import Pushbullet
 from mqtt_publish import Publisher
 
 
