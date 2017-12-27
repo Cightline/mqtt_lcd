@@ -30,6 +30,7 @@ class Handler():
         self.lcd.clear()
         self.reset_backlight()
         self.lcd.set_autoscroll(False)
+        self.lcd.set_splash_screen('TEST FUCK', 16*2)
         self.lcd.write('waiting...')
         self.buffer = ['','']
 
@@ -121,11 +122,11 @@ class Handler():
 
         self.lcd.clear()
         self.lcd.set_cursor_position(1,1)
-        self.lcd.write(title)
+        self.lcd.write(str(title))
         self.buffer[0] = title
         self.lcd.set_cursor_position(1,2)
         self.buffer[1] = msg
-        self.lcd.write(msg)
+        self.lcd.write(str(msg))
 
 
     def display_loop(self):
