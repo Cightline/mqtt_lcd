@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 class Publisher():
     def __init__(self):
         
-        with open(os.path.expanduser('~/.config/mqtt/publish.json'), 'r') as cfg:
+        with open(os.path.expanduser('~/.config/mqtt/lcd.json'), 'r') as cfg:
             self.config = json.load(cfg)
 
         self.client = mqtt.Client()

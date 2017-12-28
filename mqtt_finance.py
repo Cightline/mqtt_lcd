@@ -1,14 +1,13 @@
 import os
 import json
 import requests
+import argparse
 
 from mqtt_publish import Publisher
 
 
 class Finance():
     def __init__(self):
-        with open(os.path.expanduser('~/.config/mqtt/finance.json'), 'r') as cfg:
-            self.config = json.load(cfg)
 
         self.publisher = Publisher()
 
@@ -31,33 +30,30 @@ class Finance():
 
         return fin_data
 
-    def send_ticker_data(self):
+    def send_bitcoin_data(self):
 
-        if self.config['bitcoin'] == True:
-            import gdax
+        import gdax
 
-            public_client = gdax.PublicClient()
+        public_client = gdax.PublicClient()
 
-            data = public_client.get_product_24hr_stats(product_id='BTC-USD')
+        data = public_client.get_product_24hr_stats(product_id='BTC-USD')
 
-            if 'message' in data and 'maintenance' in data['message']:
-                self.publisher.publish(msg='down for MX', title='GDAX', type_='bitcoin', alert=False)
+        if 'message' in data and 'maintenance' in data['message']:
+            self.publisher.publish(msg='down for MX', title='GDAX', type_='bitcoin', alert=False)
 
-            else:
-                l = float(data['last'])
-                o = float(data['open'])
+        else:
+            l = float(data['last'])
+            o = float(data['open'])
 
-                c = ((l - o)/o) * 100
-               
-                #4,4,4,4,21,14,4 down_arrow
-                self.publisher.publish(msg='%d %4.2f' % (l, c), title='BTC', type_='bitcoin', alert=False)
-                
+            c = ((l - o)/o) * 100
+           
+            #4,4,4,4,21,14,4 down_arrow
+            self.publisher.publish(msg='%d %4.2f' % (l, c), title='BTC', type_='bitcoin', alert=False)
+     
 
-        if 'tickers' not in self.config:
-            return
+    def send_ticker_data(self, tickers):
 
-
-        for ticker in self.config['tickers']:
+        for ticker in tickers:
             p = self.get_price(ticker)
 
             if not p:
@@ -72,4 +68,18 @@ class Finance():
 
 if __name__ == '__main__':
     mqtt_f = Finance()
-    mqtt_f.send_ticker_data()
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--bitcoin', action='store_true',       help='send the Bitcoin price')
+    parser.add_argument('--tickers', action='store', nargs='+', help='send ticker prices')
+
+    args = parser.parse_args()
+
+    if args.tickers:
+        mqtt_f.send_ticker_data(args.tickers)
+
+    if args.bitcoin:
+        mqtt_f.send_bitcoin_data()
+
+

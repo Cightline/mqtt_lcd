@@ -4,17 +4,18 @@ import os
 import time
 import datetime
 
-import daemon
 import paho.mqtt.client as mqtt
 
 from lcdbackpack import LcdBackpack
 
 class Handler():
     def __init__(self):
-        self.config_path = os.path.expanduser('~/.config/mqtt/publish.json')
+        self.config_path = os.path.expanduser('~/.config/mqtt/lcd.json')
         self.config      = self.load_config()
         self.msg_queue   = []
         self.client      = mqtt.Client()
+        self.buffer      = ['','']
+        self.connected   = False
 
         self.client.on_connect    = self.on_connect
         self.client.on_disconnect = self.on_disconnect
@@ -24,15 +25,12 @@ class Handler():
         self.client.tls_set()
 
          
-        
-        self.lcd = LcdBackpack('/dev/serial/by-id/usb-239a_Adafruit_Industries-if00', 115200)
+        self.lcd = LcdBackpack(self.config['dev'], self.config['baud'])
         self.lcd.connect()
         self.lcd.clear()
         self.reset_backlight()
         self.lcd.set_autoscroll(False)
-        self.lcd.set_splash_screen('Starting up', 16*2)
-        self.lcd.write('waiting...')
-        self.buffer = ['','']
+        self.display_msg('waiting to', 'connect')
 
         try:
             self.client.connect(host=self.config['host'], port=self.config['port'])
@@ -48,7 +46,7 @@ class Handler():
 
 
     def load_config(self):
-        with open(os.path.expanduser('~/.config/mqtt_lcd/config.json'), 'r') as cfg:
+        with open(self.config_path, 'r') as cfg:
             config = json.load(cfg)
 
         return config
@@ -64,10 +62,12 @@ class Handler():
         print('connected with result code: %s' % (rc))
 
         self.client.subscribe('pi/#')
+        self.connected = True
 
     def on_disconnect(self, client, userdata, rc):
         print('disconnected: code [%s]' % (rc)) 
         self.display_msg('disconnected', '')
+        self.connected = False
 
 
     def on_message(self, client, userdata, msg):
@@ -130,14 +130,24 @@ class Handler():
 
 
     def display_loop(self):
-        #print(dir(self.lcd))
+        # Loop and display the messages.
+        # If there are no messages, it will let the user know and 
+        # sleep for a few seconds. 
         while True:
             if not len(self.msg_queue):
-                #print('No messages in queue')
+                if self.connected:
+                    self.display_msg('connected','[no messages]')
+
+                else:
+                    self.display_msg('disconnected', '')
+
                 time.sleep(3)
                 continue
-
-            #print('%s message(s) in queue' % (len(self.msg_queue)))
+    
+        
+            # This for loop will break if it deletes an expired message. 
+            # Once it breaks, the while loop sees it and restarts it. 
+            # After the message is deleted, there is no time.sleep. 
             for x in range(len(self.msg_queue)):
                 message = self.msg_queue[x]
                 
@@ -149,7 +159,8 @@ class Handler():
                 if time_diff >= self.config['message_exp']:
                     print('removing message: %s' % (message))
                     self.msg_queue.remove(message)
-                    continue
+                    print('message deleted, breaking from for loop')
+                    break
 
                 if message['alert'] == True:
                     self.lcd.set_backlight_red()
