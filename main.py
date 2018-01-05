@@ -16,6 +16,7 @@ class Handler():
         self.client      = mqtt.Client()
         self.buffer      = ['','']
         self.connected   = False
+        self.scrolling   = False
 
         self.client.on_connect    = self.on_connect
         self.client.on_disconnect = self.on_disconnect
@@ -96,6 +97,13 @@ class Handler():
         if 'alert' in m and m['alert'] == True:
             alert = True
 
+        if type_ == 'immediate':
+            self.display_msg(title, msg, alert=False)
+            time.sleep(1)
+
+            return 
+
+        # See if the same type already exists
         for x in range(len(self.msg_queue)):
             item = self.msg_queue[x]
 
@@ -111,22 +119,57 @@ class Handler():
 
 
     def reset_backlight(self):
-        self.lcd.set_backlight_rgb(100, 100, 100)
+        self.lcd.set_backlight_rgb(255, 255, 0)
 
 
     def display_msg(self, title, msg, alert=False):
     
+
+        if not title:
+            title = 'no title'
+        
+        title = title[:16]
+
+        title = ('{{0: <{}}}'.format(16).format(title))
+
+       
         # don't redisplay the same message
         if self.buffer[0] == title and self.buffer[1] == msg:
             return 
 
-        self.lcd.clear()
-        self.lcd.set_cursor_position(1,1)
-        self.lcd.write(str(title))
-        self.buffer[0] = title
-        self.lcd.set_cursor_position(1,2)
-        self.buffer[1] = msg
-        self.lcd.write(str(msg))
+        # scroll the message if its too long
+        if len(msg) > self.config['characters'] and self.config['scroll'] == True:
+            self.lcd.clear()
+            self.scrolling = True
+            for x in range(len(msg)):
+                segment = msg[x:(16+x)]
+
+                segment = ('{{0: <{}}}'.format(16).format(segment))
+
+                # self._ser.write('{{0: <{}}}'.format(lcd_chars).format(string).encode())
+                self.lcd.set_cursor_position(1,1)
+                self.lcd.write(title)
+                self.buffer[0] = title
+                self.lcd.set_cursor_position(1,2)
+                self.lcd.write(segment)
+                self.buffer[1] = segment
+                time.sleep(.3)
+
+                #if x < len(msg):
+                #    self.lcd.clear()
+                
+            self.scrolling = False 
+
+
+        else:
+
+            self.lcd.clear()
+            self.lcd.set_cursor_position(1,1)
+            self.lcd.write(str(title))
+            self.buffer[0] = title
+            self.lcd.set_cursor_position(1,2)
+            self.buffer[1] = msg
+            self.lcd.write(str(msg))
 
 
     def display_loop(self):
@@ -134,6 +177,10 @@ class Handler():
         # If there are no messages, it will let the user know and 
         # sleep for a few seconds. 
         while True:
+            if self.scrolling == True:
+                time.sleep(3)
+                continue 
+
             if not len(self.msg_queue):
                 if self.connected:
                     self.display_msg('connected','[no messages]')
