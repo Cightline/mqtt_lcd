@@ -118,11 +118,14 @@ class Pushover():
 
         messages = j['messages']
 
+        h = []
+
         # dict_keys(['id', 'message', 'app', 'aid', 'icon', 'date', 'priority', 'acked', 'umid', 'title'])
         for message in j['messages']:
             msg   = message['message']
             title = message['title']
             id_  = message['id']
+            h.append(id_)
 
             to_send = '%s %s' % (title, msg)
 
@@ -133,6 +136,15 @@ class Pushover():
 
             self.publisher.publish(msg=to_send, title="Pushover", type_='pushover_%s' % (id_), alert=False)
 
+        if h:
+            # Delete the messages by using the "highest" id
+            d = self.post_page('https://api.pushover.net/1/devices/%s/update_highest_message.json' % (self.device_id), 
+                    data={'secret':self.secret,
+                          'message':max(h)})
+
+            if d['status'] != 1:
+                print(d)
+                print('unable to delete messages')
 
 
 if __name__ == '__main__':

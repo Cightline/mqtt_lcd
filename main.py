@@ -3,6 +3,8 @@ import json
 import os
 import time
 import datetime
+import threading
+
 
 import paho.mqtt.client as mqtt
 
@@ -97,12 +99,7 @@ class Handler():
         if 'alert' in m and m['alert'] == True:
             alert = True
 
-        if type_ == 'immediate':
-            self.display_msg(title, msg, alert=False)
-            time.sleep(1)
-
-            return 
-
+        
         # See if the same type already exists
         for x in range(len(self.msg_queue)):
             item = self.msg_queue[x]
@@ -121,9 +118,23 @@ class Handler():
     def reset_backlight(self):
         self.lcd.set_backlight_rgb(255, 255, 0)
 
+    # Give the current message that is looping, and it will return True if a new message is in the queue
+    # used to break out of a display_msg loop
+    def check_new_msg(self, dt):
+        for m in self.msg_queue:
+            if m['type'] == 'immediate' and m['datetime'] > dt:
+                return True
+
+
+        return False
+        
 
     def display_msg(self, title, msg, alert=False):
+
+        title = str(title)
+        msg   = str(msg)
     
+        now = datetime.datetime.now()
 
         if not title:
             title = 'no title'
@@ -137,11 +148,16 @@ class Handler():
         if self.buffer[0] == title and self.buffer[1] == msg:
             return 
 
+        print('what', msg, title)
         # scroll the message if its too long
         if len(msg) > self.config['characters'] and self.config['scroll'] == True:
             self.lcd.clear()
             self.scrolling = True
             for x in range(len(msg)):
+
+                if self.check_new_msg(now) == True:
+                    break
+
                 segment = msg[x:(16+x)]
 
                 segment = ('{{0: <{}}}'.format(16).format(segment))
@@ -162,6 +178,7 @@ class Handler():
 
 
         else:
+            print('bruh')
 
             self.lcd.clear()
             self.lcd.set_cursor_position(1,1)
@@ -177,10 +194,6 @@ class Handler():
         # If there are no messages, it will let the user know and 
         # sleep for a few seconds. 
         while True:
-            if self.scrolling == True:
-                time.sleep(3)
-                continue 
-
             if not len(self.msg_queue):
                 if self.connected:
                     self.display_msg('connected','[no messages]')
@@ -191,16 +204,29 @@ class Handler():
                 time.sleep(3)
                 continue
     
-        
             # This for loop will break if it deletes an expired message. 
             # Once it breaks, the while loop sees it and restarts it. 
             # After the message is deleted, there is no time.sleep. 
             for x in range(len(self.msg_queue)):
+
+                if self.scrolling == True:
+                    break
+                 
                 message = self.msg_queue[x]
+
+                msg   = message['msg']
+                title = message['title']
+                type_ = message['type']
                 
                 now = datetime.datetime.utcnow()
 
-
+                #if type_ == 'immediate':
+                #    self.msg_queue.remove(message)
+                #    self.display_msg(title, msg)
+                #    time.sleep(1)
+                #    break
+                
+                   
                 time_diff = ((now - message['datetime']).seconds/60)
 
                 if time_diff >= self.config['message_exp']:
