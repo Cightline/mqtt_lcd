@@ -99,20 +99,30 @@ class Handler():
         if 'alert' in m and m['alert'] == True:
             alert = True
 
+         
         
         # See if the same type already exists
-        for x in range(len(self.msg_queue)):
-            item = self.msg_queue[x]
+        # Also, give the option to 'update' or not
 
-            if item['type'] == type_:
-                item['msg']      = msg
-                item['datetime'] = now
-                item['alert']    = alert
-                item['title']    = title
-                
-                return 
+        if 'update' in m and m['update'] == True:
+            for x in range(len(self.msg_queue)):
+                item = self.msg_queue[x]
 
-        self.msg_queue.append({'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert})
+                if item['type'] == type_:
+                    item['msg']      = msg
+                    item['datetime'] = now
+                    item['alert']    = alert
+                    item['title']    = title
+                    
+                    return 
+
+        if 'color' in m and m['color']:
+            color = m['color']
+
+        else:
+            color = None
+        
+        self.msg_queue.append({'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert, 'color':color})
 
 
     def reset_backlight(self):
@@ -217,6 +227,8 @@ class Handler():
                 msg   = message['msg']
                 title = message['title']
                 type_ = message['type']
+                color = message['color']
+         
                 
                 now = datetime.datetime.utcnow()
 
@@ -242,8 +254,12 @@ class Handler():
                     self.reset_backlight()
 
                 else:
+                    if color:
+                        self.lcd.set_backlight_rgb(color[0], color[1], color[2])
+
                     self.display_msg(message['title'], message['msg'])
                     time.sleep(self.config['delay'])
+                    self.reset_backlight()
 
 
 

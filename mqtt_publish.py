@@ -26,8 +26,8 @@ class Publisher():
         self.client.subscribe('pi/#')
 
 
-    def publish(self, msg, title, type_, alert, qos=2):
-        j_data = json.dumps({'msg':msg, 'title':title, 'type':type_, 'alert':alert})
+    def publish(self, msg, title, type_, alert, color=None, qos=2):
+        j_data = json.dumps({'msg':msg, 'title':title, 'type':type_, 'alert':alert, 'color':color})
         infot = self.client.publish('pi', j_data, qos=qos)
 
         infot.wait_for_publish()

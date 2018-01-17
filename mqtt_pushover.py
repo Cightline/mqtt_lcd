@@ -123,18 +123,22 @@ class Pushover():
         # dict_keys(['id', 'message', 'app', 'aid', 'icon', 'date', 'priority', 'acked', 'umid', 'title'])
         for message in j['messages']:
             msg   = message['message']
-            title = message['title']
+
+            if 'title' in message:
+                title = message['title']
+
+            else:
+                title = ''
+
             id_  = message['id']
             h.append(id_)
 
-            to_send = '%s %s' % (title, msg)
-
-            to_send = '%s...' % (to_send[:self.character_limit])
+            to_send = '%s...' % (msg[:self.character_limit])
 
             
 
 
-            self.publisher.publish(msg=to_send, title="Pushover", type_='pushover_%s' % (id_), alert=False)
+            self.publisher.publish(msg=to_send, title=title, type_='pushover_%s' % (id_), alert=False, color=[0, 0, 255])
 
         if h:
             # Delete the messages by using the "highest" id
