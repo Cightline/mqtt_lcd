@@ -4,6 +4,7 @@ import os
 import time
 import datetime
 import threading
+import copy
 
 
 import paho.mqtt.client as mqtt
@@ -33,6 +34,7 @@ class Handler():
         self.lcd.clear()
         self.reset_backlight()
         self.lcd.set_autoscroll(False)
+        self.break_loop = False
         self.display_msg('waiting to', 'connect')
 
         try:
@@ -55,11 +57,17 @@ class Handler():
         return config
 
 
+    def delay(self, seconds):
+        print('delaying for %s seconds...' % (seconds))
+        time.sleep(seconds)
+
+
+
     def on_connect(self, client, userdata, flags, rc):
         if rc != 0:
             print('Unable to connect: code [%s]' % (rc))
             self.display_msg('error', 'cant connect')
-            time.sleep(30)
+            self.delay(10)
             
         self.display_msg('connected', '')
         print('connected with result code: %s' % (rc))
@@ -122,7 +130,10 @@ class Handler():
         else:
             color = None
         
-        self.msg_queue.append({'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert, 'color':color})
+        self.msg_queue.insert(0, {'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert, 'color':color})
+        self.current_index = 0
+
+        self.break_loop = True
 
 
     def reset_backlight(self):
@@ -137,12 +148,13 @@ class Handler():
 
 
         return False
+
         
 
     def display_msg(self, title, msg, alert=False):
 
-        title = str(title)
-        msg   = str(msg)
+        title = str(title).strip()
+        msg   = str(msg).strip()
     
         now = datetime.datetime.now()
 
@@ -158,9 +170,11 @@ class Handler():
         if self.buffer[0] == title and self.buffer[1] == msg:
             return 
 
-        print('what', msg, title)
+
+        #print('what', msg, title)
+        #print(len(msg))
         # scroll the message if its too long
-        if len(msg) > self.config['characters'] and self.config['scroll'] == True:
+        if len(msg) > self.config['row_characters'] and self.config['scroll'] == True:
             self.lcd.clear()
             self.scrolling = True
             for x in range(len(msg)):
@@ -181,14 +195,13 @@ class Handler():
                 self.buffer[1] = segment
                 time.sleep(.3)
 
-                #if x < len(msg):
-                #    self.lcd.clear()
+                if x < len(msg):
+                    self.lcd.clear()
                 
             self.scrolling = False 
 
 
         else:
-            print('bruh')
 
             self.lcd.clear()
             self.lcd.set_cursor_position(1,1)
@@ -203,66 +216,101 @@ class Handler():
         # Loop and display the messages.
         # If there are no messages, it will let the user know and 
         # sleep for a few seconds. 
-        while True:
+        self.current_index = 0
+
+        wlq_len = len(self.msg_queue)
+
+        while wlq_len == len(self.msg_queue):
+            x = self.current_index
             if not len(self.msg_queue):
-                if self.connected:
-                    self.display_msg('connected','[no messages]')
+                if self.connected: self.display_msg('connected','[no messages]')
 
                 else:
                     self.display_msg('disconnected', '')
-
-                time.sleep(3)
+                
+                self.delay(1)
                 continue
     
             # This for loop will break if it deletes an expired message. 
             # Once it breaks, the while loop sees it and restarts it. 
             # After the message is deleted, there is no time.sleep. 
-            for x in range(len(self.msg_queue)):
+            print('x', x)
 
-                if self.scrolling == True:
-                    break
-                 
-                message = self.msg_queue[x]
+            if wlq_len != len(self.msg_queue):
+                break
+            
 
-                msg   = message['msg']
-                title = message['title']
-                type_ = message['type']
-                color = message['color']
-         
-                
-                now = datetime.datetime.utcnow()
+            if self.scrolling == True:
+                break
+             
+            print('current message: %s' % (self.msg_queue[x]))
+            msg   = self.msg_queue[x]['msg']
+            title = self.msg_queue[x]['title']
+            type_ = self.msg_queue[x]['type']
+            color = self.msg_queue[x]['color']
+     
+            
+            now = datetime.datetime.utcnow()
 
-                #if type_ == 'immediate':
-                #    self.msg_queue.remove(message)
-                #    self.display_msg(title, msg)
-                #    time.sleep(1)
-                #    break
-                
-                   
-                time_diff = ((now - message['datetime']).seconds/60)
+            #if type_ == 'immediate':
+            #    self.msg_queue.remove(message)
+            #    self.display_msg(title, msg)
+            #    time.sleep(1)
+            #    break
+            
+               
+            time_diff = ((now - self.msg_queue[x]['datetime']).seconds/60)
 
-                if time_diff >= self.config['message_exp']:
-                    print('removing message: %s' % (message))
-                    self.msg_queue.remove(message)
-                    print('message deleted, breaking from for loop')
-                    break
+            if time_diff >= self.config['message_exp']:
+                print('removing message: %s' % (self.msg_queue[x]))
+                self.msg_queue.remove(self.msg_queue[x])
+                print('message deleted, restarting loop')
 
-                if message['alert'] == True:
-                    self.lcd.set_backlight_red()
-                    self.display_msg(message['title'], message['msg'])
-                    time.sleep(self.config['delay'])
-                    self.reset_backlight()
+                # restart at the next message in the queue
+                q_len = len(self.msg_queue)
+
+                if q_len <= 1:
+                    self.current_index = 0
 
                 else:
-                    if color:
-                        self.lcd.set_backlight_rgb(color[0], color[1], color[2])
+                    self.current_index = q_len - 1
 
-                    self.display_msg(message['title'], message['msg'])
-                    time.sleep(self.config['delay'])
-                    self.reset_backlight()
+                break
+
+            if self.msg_queue[x]['alert'] == True:
+                self.lcd.set_backlight_red()
+                self.display_msg(title, msg)
+                self.delay(self.config['delay'])
+                self.reset_backlight()
+
+            else:
+                if self.scrolling == True:
+                    continue 
+
+                if color:
+                    self.lcd.set_backlight_rgb(color[0], color[1], color[2])
+            
+                title = ('{{0: <{}}}'.format(16).format(title))
+
+                self.display_msg(title,  msg)
+
+                if len(msg) > self.config['row_characters']:
+                    self.delay(2)
+
+                else:
+                    self.delay(self.config['delay'])
+
+                self.reset_backlight()
+            
+            
+            self.current_index += 1
+
+            if self.current_index >= len(self.msg_queue):
+                self.current_index = 0
 
 
-
+        wql_len = len(self.msg_queue) 
+        self.display_loop()
 
 if __name__ == '__main__':
     handler = Handler()

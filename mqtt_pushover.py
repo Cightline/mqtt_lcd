@@ -135,8 +135,6 @@ class Pushover():
 
             to_send = '%s...' % (msg[:self.character_limit])
 
-            
-
 
             self.publisher.publish(msg=to_send, title=title, type_='pushover_%s' % (id_), alert=False, color=[0, 0, 255])
 
