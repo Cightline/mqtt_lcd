@@ -130,7 +130,7 @@ class Handler():
         else:
             color = None
         
-        self.msg_queue.insert(0, {'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert, 'color':color})
+        self.msg_queue.append({'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert, 'color':color})
         self.current_index = 0
 
         self.break_loop = True

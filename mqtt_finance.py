@@ -48,7 +48,7 @@ class Finance():
             c = ((l - o)/o) * 100
            
             #4,4,4,4,21,14,4 down_arrow
-            self.publisher.publish(msg='%d (%4.2f)' % (l, c), title='BTC', type_='bitcoin', alert=False)
+            self.publisher.publish(msg='%d (%4.2f)' % (l, c), title='BTC', type_='bitcoin', alert=False, color=None, update=True)
      
 
     def send_ticker_data(self, tickers):
@@ -62,7 +62,9 @@ class Finance():
             self.publisher.publish(msg='%4.2f (%4.2f)' % (float(p['l']), float(p['cp'])), 
                                    title=ticker.upper(), 
                                    type_='ticker_%s' % (ticker), 
-                                   alert=False)
+                                   alert=False,
+                                   color=None,
+                                   update=True)
 
 
 
