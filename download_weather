@@ -1,2 +1,0 @@
-#!/bin/bash
-wget "https://radblast.wunderground.com/cgi-bin/radar/WUNIDS_map?station=FWS&brand=wui&num=1&delay=0&type=N0R&frame=0&scale=1.000&noclutter=0&showstorms=1&mapx=0&mapy=0&centerx=0&centery=240&transx=0&transy=0&showlabels=1&severe=0&rainsnow=0&lightning=0&smooth=0&rand=25368623&lat=0&lon=0&label=you" -O w.png
