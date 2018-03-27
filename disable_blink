@@ -1,2 +1,3 @@
 #!/bin/bash
+# https://unix.stackexchange.com/questions/58961/how-do-i-let-an-sdl-app-not-running-as-root-use-the-console
 echo "0" > /sys/class/graphics/fbcon/cursor_blink; setterm --blank 0

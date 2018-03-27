@@ -20,6 +20,85 @@ from PIL import Image
 
 #from lcdbackpack import LcdBackpack
 
+class EventHandler(threading.Thread):
+    def __init__(self, screens):
+        threading.Thread.__init__(self)
+        self.last_rotate    = None
+        self.current_screen = 0
+        self.screens        = screens
+        self.cq             = 0
+        self.last_event     = None
+        self.hold_timer     = None
+
+    def run(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    os._exit(0)
+
+                print('touch event')
+                self.rotate_screen()
+                self.last_event = datetime.datetime.utcnow()
+                self.check_hold()
+
+                #print('event: %s' % (event))
+  
+    def check_hold(self):
+
+        # Store event time
+
+        # If new event happens within 1 second hold last event time
+
+        # If total time goes beyond 5 seconds, exit
+
+        now = datetime.datetime.utcnow()
+
+        if not self.hold_timer:
+            self.hold_timer = now
+            return 
+
+        time_diff       = ((now - self.last_event).seconds)
+
+        #print('time_diff', time_diff)
+
+        if time_diff < 1:
+            #print('time_diff < 2')
+            hold_diff = ((now - self.hold_timer).seconds)
+            #print('hold_diff: %s' % (hold_diff))
+            if hold_diff >= 5:
+                pygame.quit()
+                os._exit(0)
+
+        else:
+            self.hold_timer = now
+
+
+    def rotate_screen(self):
+        now       = datetime.datetime.utcnow()
+        first_run = False
+
+        if not self.last_rotate:
+            self.last_rotate = now
+            first_run = True
+            time_diff = 0
+
+        else:
+            time_diff = ((now - self.last_rotate).seconds)
+
+        
+        if time_diff > 1 or first_run == True:
+
+            if self.current_screen == self.screens:
+                self.current_screen = 0
+
+            else:
+                self.current_screen += 1
+
+            self.last_rotate = now
+
+
+
 class Handler():
     def __init__(self):
         
@@ -106,38 +185,13 @@ class Handler():
 
         self.logger.debug('starting loop')
 
+        event_thread = EventHandler(self.screens)
+        event_thread.start()
+
         while True:
-            for event in pygame.event.get():
-                print('touch event')
-                self.rotate_screen()
-                break
-                #print('event: %s' % (event))
-    
             self.update_display()
-        
-    def rotate_screen(self):
-        now       = datetime.datetime.utcnow()
-        first_run = False
-
-        if not self.last_rotate:
-            self.last_rotate = now
-            first_run = True
-            time_diff = 0
-
-        else:
-            time_diff = ((now - self.last_rotate).seconds)
-
-        
-        if time_diff > 1 or first_run == True:
-
-            if self.current_screen == self.screens:
-                self.current_screen = 0
-
-            else:
-                self.current_screen += 1
-
-            self.last_rotate = now
-
+            time.sleep(1)
+    
     def load_config(self):
         with open(self.config_path, 'r') as cfg:
             config = json.load(cfg)
@@ -252,7 +306,7 @@ class Handler():
                     fontname=self.font_name,
                     width=self.font_width)
             
-            pygame.display.flip()
+            pygame.display.update()
             return 
 
 
@@ -293,7 +347,7 @@ class Handler():
             to_display = pygame.transform.scale(to_display, (self.size[0], self.size[1]))
 
             self.screen.blit(to_display, (0, 0))
-            pygame.display.flip()
+            pygame.display.update()
             return True
 
         except:
@@ -356,7 +410,6 @@ class Handler():
         
         if not self.display_image('%s/w.gif' % (self.temp_path)):
             self.display_error('unable to show radar image')
-            time.sleep(3)
         
 
     def display_status(self, need_update=False):
@@ -381,7 +434,7 @@ class Handler():
                        width=self.font_width)
 
 
-        pygame.display.flip()
+        pygame.display.update()
 
 
 if __name__ == '__main__':
