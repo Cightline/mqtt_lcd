@@ -5,6 +5,7 @@ import time
 import datetime
 import threading
 import copy
+import logging
 
 
 import paho.mqtt.client as mqtt
@@ -20,6 +21,7 @@ class Handler():
         self.buffer      = ['','']
         self.connected   = False
         self.scrolling   = False
+        self.displaying_msg = False
 
         self.client.on_connect    = self.on_connect
         self.client.on_disconnect = self.on_disconnect
@@ -31,22 +33,37 @@ class Handler():
          
         self.lcd = LcdBackpack(self.config['dev'], self.config['baud'])
         self.lcd.connect()
-        self.lcd.clear()
-        self.reset_backlight()
-        self.lcd.set_autoscroll(False)
+        #self.lcd.clear()
+        #self.reset_backlight()
         self.break_loop = False
         self.display_msg('waiting to', 'connect')
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+        fh = logging.FileHandler(self.config['log_path'])
+        fh.setLevel(logging.DEBUG)
+        
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+
+        fh.setFormatter(formatter)
+
+        self.logger.addHandler(fh) 
 
         try:
             self.client.connect(host=self.config['host'], port=self.config['port'])
     
         except Exception as e:
-            print('execption: %s' % (e))
+            self.logger.error('exception: %s' % (e))
             self.display_msg('error', 'cant connect')
 
 
         self.client.loop_start()
-        self.display_loop()
+
+        self.logger.debug('starting loop')
+
+        while True:
+            self.logger.debug('iterating self.display_loop()')
+            self.display_loop()
         
 
 
@@ -58,6 +75,7 @@ class Handler():
 
 
     def delay(self, seconds):
+        self.logger.debug('delaying for %s seconds' % (seconds))
         print('delaying for %s seconds...' % (seconds))
         time.sleep(seconds)
 
@@ -67,9 +85,11 @@ class Handler():
         if rc != 0:
             print('Unable to connect: code [%s]' % (rc))
             self.display_msg('error', 'cant connect')
+            self.logger.info("can't connect, code [%s]" % (rc))
             self.delay(10)
             
         self.display_msg('connected', '')
+        self.logger.info('connected')
         print('connected with result code: %s' % (rc))
 
         self.client.subscribe('pi/#')
@@ -131,13 +151,17 @@ class Handler():
             color = None
         
         self.msg_queue.append({'msg':msg, 'datetime':now, 'type':type_, 'title':title, 'alert':alert, 'color':color})
+        self.logger.debug("self.msg_queue.append({'msg':%s, 'datetime':%s, 'type':%s, 'title':%s, 'alert':%s, 'color':%s})" % (msg, now, type_, title, alert, color))
         self.current_index = 0
 
         self.break_loop = True
 
 
     def reset_backlight(self):
+        self.lcd.connect()
+        self.lcd.set_brightness(255)
         self.lcd.set_backlight_rgb(255, 255, 0)
+        self.lcd.disconnect()
 
     # Give the current message that is looping, and it will return True if a new message is in the queue
     # used to break out of a display_msg loop
@@ -152,6 +176,16 @@ class Handler():
         
 
     def display_msg(self, title, msg, alert=False):
+
+        if self.displaying_msg:
+            print('already busy')
+            return 
+
+        self.displaying_msg = True
+
+        self.lcd.connect()
+        self.lcd.set_autoscroll(False)
+        self.lcd.set_brightness(255)
 
         title = str(title).strip()
         msg   = str(msg).strip()
@@ -168,6 +202,7 @@ class Handler():
        
         # don't redisplay the same message
         if self.buffer[0] == title and self.buffer[1] == msg:
+            self.displaying_msg = False
             return 
 
 
@@ -180,7 +215,8 @@ class Handler():
             for x in range(len(msg)):
 
                 if self.check_new_msg(now) == True:
-                    break
+                    self.displaying_msg = False
+                    return
 
                 segment = msg[x:(16+x)]
 
@@ -212,6 +248,10 @@ class Handler():
             self.lcd.write(str(msg))
 
 
+        self.lcd.disconnect()
+        self.displaying_msg = False
+
+
     def display_loop(self):
         # Loop and display the messages.
         # If there are no messages, it will let the user know and 
@@ -220,12 +260,21 @@ class Handler():
 
         wlq_len = len(self.msg_queue)
 
-        while wlq_len == len(self.msg_queue):
+        self.logger.debug('wlq_len: %s' % (wlq_len))
+
+        while True:
             x = self.current_index
+            
+            self.logger.debug('wlq_len == len(self.msg_queue)')
+            self.logger.debug('x: %s' % x)
+
             if not len(self.msg_queue):
-                if self.connected: self.display_msg('connected','[no messages]')
+                if self.connected: 
+                    self.display_msg('connected','[no messages]')
+                    self.logger.info('no messages')
 
                 else:
+                    self.logger.info('disconnected')
                     self.display_msg('disconnected', '')
                 
                 self.delay(1)
@@ -237,13 +286,16 @@ class Handler():
             print('x', x)
 
             if wlq_len != len(self.msg_queue):
-                break
+                self.logger.debug('wql_len != len(self.msg_queue)')
+                return
             
 
             if self.scrolling == True:
-                break
+                self.logger.debug('self.scrolling == True')
+                return
              
             print('current message: %s' % (self.msg_queue[x]))
+            self.logger.debug('current message: %s' % (self.msg_queue[x]))
             msg   = self.msg_queue[x]['msg']
             title = self.msg_queue[x]['title']
             type_ = self.msg_queue[x]['type']
@@ -274,8 +326,8 @@ class Handler():
 
                 else:
                     self.current_index = q_len - 1
-
-                break
+                    
+                return
 
             if self.msg_queue[x]['alert'] == True:
                 self.lcd.set_backlight_red()
@@ -285,6 +337,7 @@ class Handler():
 
             else:
                 if self.scrolling == True:
+                    self.logger.debug('self.scrolling == True')
                     continue 
 
                 if color:
@@ -292,9 +345,10 @@ class Handler():
             
                 title = ('{{0: <{}}}'.format(16).format(title))
 
-                self.display_msg(title,  msg)
+                self.display_msg(title, msg)
 
                 if len(msg) > self.config['row_characters']:
+                    self.logger.debug("len(msg) > self.config['row_characters']")
                     self.delay(2)
 
                 else:
@@ -308,9 +362,8 @@ class Handler():
             if self.current_index >= len(self.msg_queue):
                 self.current_index = 0
 
-
-        wql_len = len(self.msg_queue) 
-        self.display_loop()
+        
+        #wql_len = len(self.msg_queue) 
 
 if __name__ == '__main__':
     handler = Handler()

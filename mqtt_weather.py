@@ -35,7 +35,10 @@ class Weather():
 
         t, w = data['temp_f'], data['weather']
 
-        self.publisher.publish(msg=w, title=t, type_='weather', alert=False, color=None, update=True)
+        msg = '%s %s' % (int(t), w)
+
+
+        self.publisher.publish(msg=msg, title='', type_='weather', alert=False, color=None, update=True)
 
 
 if __name__ == '__main__':
