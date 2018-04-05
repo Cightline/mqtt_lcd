@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "0" > /sys/class/graphics/fbcon/cursor_blink; setterm --blank 0

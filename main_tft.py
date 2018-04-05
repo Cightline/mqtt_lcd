@@ -6,11 +6,17 @@ import datetime
 import threading
 import copy
 import logging
+
+from cStringIO import StringIO
+from io import BytesIO
+
 import pygame
 import ptext
-
-
+import requests
 import paho.mqtt.client as mqtt
+
+from PIL import Image
+
 
 #from lcdbackpack import LcdBackpack
 
@@ -25,18 +31,32 @@ class Handler():
         pygame.mouse.set_visible(False)
 
         self.size   = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-        self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN)
+        self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN | pygame.DOUBLEBUF)
 
         self.font = pygame.font.Font(None, 30)
         self.background_color = (0, 0, 0)
 
-        self.config_path = os.path.expanduser('/home/admin/.config/mqtt/lcd.json')
-        self.config      = self.load_config()
-        self.msg_queue   = []
-        self.client      = mqtt.Client()
-        self.buffers     = [''] * 10
-        self.connected   = False
-        self.scrolling   = False
+        self.config_path  = os.path.expanduser('/home/admin/.config/mqtt/lcd.json')
+        self.config       = self.load_config()
+        self.msg_queue    = []
+        self.client       = mqtt.Client()
+        self.buffers      = [''] * self.config['buffers']
+        self.cache_buffers  = [''] * self.config['buffers']
+        self.connected    = False
+        self.scrolling    = False
+        self.font_name    = self.config['font_name']
+        self.text_color   = self.config['text_color']
+        self.font_size    = self.config['font_size']
+        self.font_width   = self.config['font_width']
+        self.u            = {'screen':-1}
+        self.image_buffers   = {}
+        self.error_delay     = self.config['error_delay']
+        self.radar_interval  = self.config['radar_interval']
+        self.lat             = self.config['lat']
+        self.lon             = self.config['lon']
+        self.wu_api_key      = self.config['wunderground_api_key']
+        self.temp_path       = self.config['temp_path']
+
         self.displaying_msg = False
 
         self.client.on_connect    = self.on_connect
@@ -44,6 +64,7 @@ class Handler():
         self.client.on_message    = self.on_message
         self.current_screen       = 0
         self.screens              = 1
+        self.last_rotate          = False 
 
         self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
         self.client.tls_set()
@@ -87,22 +108,35 @@ class Handler():
 
         while True:
             for event in pygame.event.get():
-                print('switching display')
+                print('touch event')
                 self.rotate_screen()
                 break
                 #print('event: %s' % (event))
-
+    
             self.update_display()
-            time.sleep(2)
         
     def rotate_screen(self):
+        now       = datetime.datetime.utcnow()
+        first_run = False
 
-        if self.current_screen == self.screens:
-            self.current_screen = 0
+        if not self.last_rotate:
+            self.last_rotate = now
+            first_run = True
+            time_diff = 0
 
         else:
-            self.current_screen += 1
+            time_diff = ((now - self.last_rotate).seconds)
 
+        
+        if time_diff > 1 or first_run == True:
+
+            if self.current_screen == self.screens:
+                self.current_screen = 0
+
+            else:
+                self.current_screen += 1
+
+            self.last_rotate = now
 
     def load_config(self):
         with open(self.config_path, 'r') as cfg:
@@ -208,31 +242,125 @@ class Handler():
 
         
 
-    def display_msg(self, title, msg, alert=False, line=0):
+    def display_msg(self, title, msg, alert=False, line=0, now=False):
+                                               #W              #H
+        if now == True:
+            self.screen.fill(self.background_color)
+            ptext.draw('Unable to get IP info', (self.size[1] * .05, self.size[0]),
+                    color=self.text_color,
+                    fontsize=self.font_size,
+                    fontname=self.font_name,
+                    width=self.font_width)
+            
+            pygame.display.flip()
+            return 
+
+
         
         self.buffers[0] = '%s %s' % (title, msg)
         self.update_display()
 
+    def display_error(self, msg):
+        print('error: ', msg)
+        self.display_msg('Error:',msg, alert=False, line=0, now=True)
+
+
     def update_display(self):
+        need_update = False
+
+
+        if self.u['screen'] == -1 or self.u['screen'] != self.current_screen:
+            need_update = True
+
         if self.current_screen == 0:
-            self.display_status()
+            self.display_status(need_update=need_update)
+            #time.sleep(3)
 
         elif self.current_screen == 1:
-            self.display_weather_image()
+            self.display_weather_image(need_update=need_update)
+            #time.sleep(3)
 
-
-    def display_weather_image(self):
-                                               #W              #H
-        weather_img = pygame.image.load('/home/admin/mqtt_lcd/w.png')
-        weather_img = pygame.transform.scale(weather_img, (self.size[0], self.size[1]))
-        self.screen.blit(weather_img, (0, 0))
-
-        pygame.display.update()
-
-    def display_status(self):
-
-        #self.size   = (pygame.display.Info().current_w, pygame.display.Info().current_h)
+        self.u['screen'] = self.current_screen
         
+        print('screen: %s (update: %s)' % (self.current_screen, need_update))
+
+    def display_image(self, path):
+        #self.screen.fill(self.background_color)
+       
+        try:
+
+            to_display = pygame.image.load(path).convert()
+            to_display = pygame.transform.scale(to_display, (self.size[0], self.size[1]))
+
+            self.screen.blit(to_display, (0, 0))
+            pygame.display.flip()
+            return True
+
+        except:
+            return False
+
+
+
+    def display_weather_image(self, need_update=False):
+
+        first_run = False
+        now = datetime.datetime.utcnow()
+
+        # If we havent stored an expiration time yet, then create the dictionary value 
+        if 'weather' not in self.u:
+            self.u['weather'] = now
+            first_run = True
+
+        time_diff = ((now - self.u['weather']).seconds)
+        print('TIME DIFF: %s' % (time_diff))
+
+        
+                
+        # Check the expiration
+        if time_diff >= self.radar_interval or first_run == True:
+            # Reset the timer now so we don't hammer the API if there is a unexplained error.
+            self.u['weather'] = now
+
+            # Get the radar image for our location
+            radar_url = "http://api.wunderground.com/api/%s/radar/image.gif?centerlat=%s&centerlon=%s&radius=100&width=%s&height=%s&newmaps=1&format=png" \
+                % (self.wu_api_key, self.lat, self.lon, self.size[0], self.size[1])
+            
+            try:
+                ir = requests.get(radar_url)
+                print(ir.url)
+
+            except Exception as e:
+                self.display_error('unable to download radar image')
+                time.sleep(self.error_delay)
+                return
+
+            if ir.status_code != 200:
+                self.display_error('unable to download radar image')
+                time.sleep(self.error_delay)
+                return 
+            
+            
+            with open('%s/w.gif.part' % (self.temp_path), 'wb') as w:
+                w.write(ir.content)
+           
+            '''if 'weather' not in self.image_buffers:
+                self.image_buffers['weather'] = BytesIO()
+                self.image_buffers['weather'].write(ir.content)
+
+            else:
+                self.image_buffers['weather'] = BytesIO()
+                self.image_buffers['weather'].write(ir.content)'''
+
+            os.rename('%s/w.gif.part' % (self.temp_path), '%s/w.gif' % (self.temp_path))
+
+        
+        if not self.display_image('%s/w.gif' % (self.temp_path)):
+            self.display_error('unable to show radar image')
+            time.sleep(3)
+        
+
+    def display_status(self, need_update=False):
+
         now = datetime.datetime.now()
 
         for msg in self.msg_queue:
@@ -247,20 +375,13 @@ class Handler():
 
         for x in range(len(self.buffers)):
             ptext.draw(self.buffers[x], (self.size[1] * .05, self.line_pos[x]), 
-                       color='white', 
-                       fontsize=30, 
-                       fontname='terminus.ttf', 
-                       width=400)
+                       color=self.text_color, 
+                       fontsize=self.font_size, 
+                       fontname=self.font_name, 
+                       width=self.font_width)
 
-        #btc_chart = pygame.image.load('/home/admin/mqtt_lcd/bitcoin_chart.png')
 
-                                                       #W              #H
-        #btc_chart = pygame.transform.scale(btc_chart, (int(self.size[0] * .66), int(self.size[1] * .66)))
-        #btc_chart = pygame.transform.scale(btc_chart, (self.size[0], self.size[1]))
-        #weather = pygame.transform.scale(weather, (self.size[0], self.size[1]))
-        #self.screen.blit(weather, (0, 0))
-
-        pygame.display.update()
+        pygame.display.flip()
 
 
 if __name__ == '__main__':
