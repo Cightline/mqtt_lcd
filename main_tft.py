@@ -17,15 +17,17 @@ import paho.mqtt.client as mqtt
 
 from PIL import Image
 
+current_screen = 0
 
 #from lcdbackpack import LcdBackpack
 
+os.nice(100)
+
 class EventHandler(threading.Thread):
-    def __init__(self, screens):
+    def __init__(self):
         threading.Thread.__init__(self)
         self.last_rotate    = None
-        self.current_screen = 0
-        self.screens        = screens
+        self.screens        = 1
         self.cq             = 0
         self.last_event     = None
         self.hold_timer     = None
@@ -39,7 +41,6 @@ class EventHandler(threading.Thread):
 
                 print('touch event')
                 self.rotate_screen()
-                self.last_event = datetime.datetime.utcnow()
                 self.check_hold()
 
                 #print('event: %s' % (event))
@@ -56,25 +57,32 @@ class EventHandler(threading.Thread):
 
         if not self.hold_timer:
             self.hold_timer = now
-            return 
 
+        if not self.last_event:
+            self.last_event = now
+
+        
         time_diff       = ((now - self.last_event).seconds)
 
         #print('time_diff', time_diff)
 
-        if time_diff < 1:
+        if time_diff <= 2:
             #print('time_diff < 2')
             hold_diff = ((now - self.hold_timer).seconds)
             #print('hold_diff: %s' % (hold_diff))
             if hold_diff >= 5:
                 pygame.quit()
+                print('held for 5 seconds, exiting')
                 os._exit(0)
 
         else:
+            #print('hold_timer reset')
             self.hold_timer = now
-
+        
+        self.last_event = datetime.datetime.utcnow()
 
     def rotate_screen(self):
+        global current_screen
         now       = datetime.datetime.utcnow()
         first_run = False
 
@@ -87,14 +95,16 @@ class EventHandler(threading.Thread):
             time_diff = ((now - self.last_rotate).seconds)
 
         
-        if time_diff > 1 or first_run == True:
+        print('time_diff', time_diff)
+        if time_diff >= 2 or first_run == True:
 
-            if self.current_screen == self.screens:
-                self.current_screen = 0
+            if current_screen == self.screens:
+                current_screen = 0
 
             else:
-                self.current_screen += 1
-
+                current_screen += 1
+            
+            print('rotated screen')
             self.last_rotate = now
 
 
@@ -111,6 +121,7 @@ class Handler():
 
         self.size   = (pygame.display.Info().current_w, pygame.display.Info().current_h)
         self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN | pygame.DOUBLEBUF)
+
 
         self.font = pygame.font.Font(None, 30)
         self.background_color = (0, 0, 0)
@@ -141,8 +152,6 @@ class Handler():
         self.client.on_connect    = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message    = self.on_message
-        self.current_screen       = 0
-        self.screens              = 1
         self.last_rotate          = False 
 
         self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
@@ -185,12 +194,12 @@ class Handler():
 
         self.logger.debug('starting loop')
 
-        event_thread = EventHandler(self.screens)
+        event_thread = EventHandler()
         event_thread.start()
 
         while True:
             self.update_display()
-            time.sleep(1)
+            time.sleep(.5)
     
     def load_config(self):
         with open(self.config_path, 'r') as cfg:
@@ -320,23 +329,24 @@ class Handler():
 
 
     def update_display(self):
+        global current_screen
         need_update = False
 
 
-        if self.u['screen'] == -1 or self.u['screen'] != self.current_screen:
+        if self.u['screen'] == -1 or self.u['screen'] != current_screen:
             need_update = True
 
-        if self.current_screen == 0:
+        if current_screen == 0:
             self.display_status(need_update=need_update)
             #time.sleep(3)
 
-        elif self.current_screen == 1:
+        elif current_screen == 1:
             self.display_weather_image(need_update=need_update)
             #time.sleep(3)
 
-        self.u['screen'] = self.current_screen
+        self.u['screen'] = current_screen
         
-        print('screen: %s (update: %s)' % (self.current_screen, need_update))
+        print('screen: %s (update: %s)' % (current_screen, need_update))
 
     def display_image(self, path):
         #self.screen.fill(self.background_color)
