@@ -29,6 +29,7 @@ class Handler():
         self.connected         = False
         self.c                 = None
         self.d                 = None
+        self.in_use            = False
 
         self.temp      = 'n/a'
         self.condition = 'n/a'
@@ -71,7 +72,7 @@ class Handler():
             #self.logger.debug('iterating self.display_loop()')
             
             now = datetime.datetime.utcnow()
-            print(self.buffer)
+            #print(self.buffer)
             try: 
                 #raise Exception('test')
                 #self.display_msg('test', 'fuck', alert=False, buffer_index=[2,3])
@@ -93,7 +94,7 @@ class Handler():
     
                 # Grab the alerts first
                 
-                print('time_diff_c', time_diff_c, 'time_diff_d', time_diff_d)
+                #print('time_diff_c', time_diff_c, 'time_diff_d', time_diff_d)
                 if time_diff_c >= 120:
                     #self.get_alerts()
                     self.get_weather()
@@ -102,9 +103,9 @@ class Handler():
                     self.display_info()
                     self.c = now
                
-                elif time_diff_d >= 5:
+                elif time_diff_d >= 10:
                     self.display_info()
-                    time.sleep(.1)
+                    time.sleep(1)
 
             except Exception as e:
                 self.logger.debug('EXCEPTION: %s' % (e))
@@ -115,7 +116,7 @@ class Handler():
 
     def on_connect(self, client, userdata, flags, rc):
         if rc != 0:
-            print('Unable to connect: code [%s]' % (rc))
+            self.logger.warn('Unable to connect: code [%s]' % (rc))
             self.display_msg('error', 'cant connect')
             self.logger.info("can't connect, code [%s]" % (rc))
 
@@ -129,7 +130,7 @@ class Handler():
 
 
     def on_disconnect(self, client, userdata, rc):
-        print('disconnected: code [%s]' % (rc))
+        self.logger.info('disconnected: code [%s]' % (rc))
         self.display_msg('disconnected', '')
         self.connected = False
 
@@ -146,7 +147,7 @@ class Handler():
 
         for key in keys:
             if key not in m:
-                print('JSON from MQTT is malformed: %s' % (m))
+                self.logger.info('JSON from MQTT is malformed: %s' % (m))
                 return 
 
         line_one = m['line_one']
@@ -270,7 +271,7 @@ class Handler():
         for x in range(len(d)):
             alert = copy.deepcopy(d[x])
             
-            print(alert['type'])
+            #print(alert['type'])
             self.current_alerts.append(alert['type'])
 
             for word in alert['message'].split(' '):
@@ -285,7 +286,7 @@ class Handler():
 
                 distance = self.haversine(storm_info['position_lat'], storm_info['position_lon'], self.config['lat'], self.config['lon'])
                 
-                print('DISTANCE', distance)
+                #print('DISTANCE', distance)
                 self.storm_distance = int(distance)
                 storm_set = True
 
@@ -295,7 +296,7 @@ class Handler():
             self.storm_distance = -1
 
 
-        print(self.current_alerts)
+        #print(self.current_alerts)
 
 
 
@@ -308,7 +309,7 @@ class Handler():
 
     def delay(self, seconds):
         self.logger.debug('delaying for %s seconds' % (seconds))
-        print('delaying for %s seconds...' % (seconds))
+        #print('delaying for %s seconds...' % (seconds))
         time.sleep(seconds)
 
 
@@ -343,8 +344,8 @@ class Handler():
         # Just set it to temp, if rain or thunderstorm is coming, then we change the T/R values
         line_one = self.temp
     
-        print('RAIN_HOUR', self.rain_hour)
-        print('T HOUR', self.thunderstorm_hour)
+        #print('RAIN_HOUR', self.rain_hour)
+        #print('T HOUR', self.thunderstorm_hour)
         # rain and thunderstorm
         if self.rain_hour != -1 and self.thunderstorm_hour != -1:
             line_one = '%s R: %s T:%s' % (self.temp, self.rain_hour, self.thunderstorm_hour)
@@ -387,6 +388,9 @@ class Handler():
 
         if self.buffer[buffer_index[1]] != line_two:
             self.buffer[buffer_index[1]] = line_two
+
+        self.current_buffer[0] = line_one
+        self.current_buffer[1] = line_two
        
         self.logger.debug('connecting to LCD')
         self.lcd.connect()
@@ -394,6 +398,7 @@ class Handler():
         self.lcd.set_autoscroll(False)
         self.logger.debug('setting brightness to 255 ')
         self.lcd.set_brightness(255)
+        self.lcd.set_contrast(150)
 
         if alert:
             self.logger.debug('message was an alert, setting backlight to (255,0,0)')
@@ -408,14 +413,21 @@ class Handler():
         self.logger.debug('setting cursor to (1,1)')
         self.lcd.set_cursor_position(1,1)
         self.logger.debug('writting self.buffer[%s]' % (buffer_index[0]))
-        self.lcd.write(self.buffer[buffer_index[0]])
-        self.logger.debug('setting cursor to (1,2)')
-        self.lcd.set_cursor_position(1,2)
-        self.logger.debug('writting self.buffer[%s]' % (buffer_index[1]))
-        self.lcd.write(self.buffer[buffer_index[1]])
 
-        self.logger.debug('disconnecting from LCD')
-        self.lcd.disconnect()
+        if self.lcd.connected and self.in_use == False:
+            self.in_use = True
+            self.lcd.write(self.buffer[buffer_index[0]])
+            self.logger.debug('setting cursor to (1,2)')
+            self.lcd.set_cursor_position(1,2)
+            self.logger.debug('writting self.buffer[%s]' % (buffer_index[1]))
+            self.lcd.write(self.buffer[buffer_index[1]])
+
+            self.logger.debug('disconnecting from LCD')
+            self.lcd.disconnect()
+            self.in_use = False
+
+        else:
+            self.logger.warn('LCD not connected, returning')
 
 if __name__ == '__main__':
     handler = Handler()
