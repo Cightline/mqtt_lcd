@@ -32,7 +32,7 @@ client.connect(config['host'], config['port'])
 
 client.loop_start()
 
-infot = client.publish('pi', json.dumps({'msg':'test message', 'title':'test title', 'type':'test_type', 'alert':False}), qos=2)
+infot = client.publish('pi', json.dumps({'line_one':'fuck', 'line_two':'bitches'}), qos=2)
 
 infot.wait_for_publish()
 

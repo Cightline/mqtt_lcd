@@ -8,8 +8,11 @@ import copy
 import logging
 import requests
 
+
+
 from math import radians, cos, sin, asin, sqrt
 
+import paho.mqtt.client as mqtt
 from lcdbackpack import LcdBackpack
 
 class Handler():
@@ -17,23 +20,30 @@ class Handler():
         self.config_path = os.path.expanduser('~/.config/mqtt/lcd.json')
         self.config      = self.load_config()
         self.msg_queue   = []
-        self.buffer      = ['','']
+        self.buffer      = [''] * 4
+        self.current_buffer = ['', '']
         self.rain_hour         = -1
         self.thunderstorm_hour = -1
         self.current_alerts    = []
         self.storm_distance    = -1
+        self.connected         = False
+        self.c                 = None
+        self.d                 = None
 
         self.temp      = 'n/a'
         self.condition = 'n/a'
         self.wind      = 'n/a'
 
+        self.client = mqtt.Client()
+        
+        self.client.on_connect    = self.on_connect
+        self.client.on_disconnect = self.on_disconnect
+        self.client.on_message    = self.on_message
 
-
+        self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
+        self.client.tls_set()
 
         self.lcd = LcdBackpack(self.config['dev'], self.config['baud'])
-        self.lcd.connect()
-        #self.lcd.clear()
-        #self.reset_backlight()
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -47,27 +57,104 @@ class Handler():
         self.logger.addHandler(fh) 
 
 
-        self.logger.debug('starting loop')
+        self.logger.debug('======== NEW INSTANCE ========')
 
-        self.display_msg('running')
+        self.display_msg('updating...')
 
         while True:
-            self.logger.debug('iterating self.display_loop()')
 
+            if not self.connected:
+                self.client.connect(host=self.config['host'], port=self.config['port'])
+            
+            self.client.loop_start()
+
+            #self.logger.debug('iterating self.display_loop()')
+            
+            now = datetime.datetime.utcnow()
+            print(self.buffer)
             try: 
                 #raise Exception('test')
-                self.get_weather()
-                self.get_alerts()
-                self.get_hourly()
+                #self.display_msg('test', 'fuck', alert=False, buffer_index=[2,3])
+                if self.c == None:
+                    self.c = now
+                    time_diff_c = 120
 
-                self.display_info()
+                else:
+                    time_diff_c = ((now - self.c).seconds)
+
+                if self.d == None:
+                    self.d = now
+                    time_diff_d = 0
+
+                else:
+                    time_diff_d = ((now - self.d).seconds)
+
+                #print('time diff: %s' % (time_diff))
+    
+                # Grab the alerts first
                 
+                print('time_diff_c', time_diff_c, 'time_diff_d', time_diff_d)
+                if time_diff_c >= 120:
+                    #self.get_alerts()
+                    self.get_weather()
+                    self.get_hourly()
+                    
+                    self.display_info()
+                    self.c = now
+               
+                elif time_diff_d >= 5:
+                    self.display_info()
+                    time.sleep(.1)
 
             except Exception as e:
                 self.logger.debug('EXCEPTION: %s' % (e))
                 self.display_msg('unknown', 'error')
 
-            time.sleep(120)
+
+
+
+    def on_connect(self, client, userdata, flags, rc):
+        if rc != 0:
+            print('Unable to connect: code [%s]' % (rc))
+            self.display_msg('error', 'cant connect')
+            self.logger.info("can't connect, code [%s]" % (rc))
+
+        self.display_msg('connected', '')
+        self.logger.info('connected')
+        print('connected with result code: %s' % (rc))
+
+        self.client.subscribe('pi/#')
+        self.connected = True
+
+
+
+    def on_disconnect(self, client, userdata, rc):
+        print('disconnected: code [%s]' % (rc))
+        self.display_msg('disconnected', '')
+        self.connected = False
+
+
+    def on_message(self, client, userdata, msg):
+        print('%s %s' % (msg.topic, msg.payload))
+
+        keys = ['line_one', 'line_two']
+
+        try:
+            m = json.loads(msg.payload)
+        except Exception as e:
+            self.logger.warn('unable to decode JSON from MQTT: %s' % (e))
+
+        for key in keys:
+            if key not in m:
+                print('JSON from MQTT is malformed: %s' % (m))
+                return 
+
+        line_one = m['line_one']
+        line_two = m['line_two']
+
+        if not self.current_alerts:
+            self.d = datetime.datetime.utcnow()
+            self.display_msg(line_one, line_two, alert=False, buffer_index=[2,3])
        
     def get_page(self, url):
         page = requests.get(url)
@@ -226,6 +313,8 @@ class Handler():
 
 
     def display_info(self):
+
+
         # prioritize alerts
         # 4 alerts per line
         if self.current_alerts:
@@ -272,12 +361,9 @@ class Handler():
 
 
 
-    def display_msg(self, line_one='', line_two='', alert=False):
+    def display_msg(self, line_one='', line_two='', alert=False, buffer_index=[0,1]):
 
-        self.lcd.connect()
-        self.lcd.set_autoscroll(False)
-        self.lcd.set_brightness(255)
-
+        self.logger.debug('doing some buffer stuff')
         # format it a little
         line_one = str(line_one)[:16]
         line_two = str(line_two)[:16]
@@ -286,29 +372,52 @@ class Handler():
 
        
         # don't redisplay the same message
-        if self.buffer[0] == line_one and self.buffer[1] == line_two:
+        '''if self.buffer[buffer_index[0]] == line_one and self.buffer[buffer_index[1]] == line_two:
             self.logger.debug('message alerady displayed, returning')
+            return '''
+
+
+        if self.current_buffer[0] == line_one and self.current_buffer[1] == line_two:
+            self.logger.debug('message already displayed, returning')
             return 
 
-        self.buffer[0] = line_one
-        self.buffer[1] = line_two
-        
+        if self.buffer[buffer_index[0]] != line_one:
+            self.buffer[buffer_index[0]] = line_one
+
+
+        if self.buffer[buffer_index[1]] != line_two:
+            self.buffer[buffer_index[1]] = line_two
+       
+        self.logger.debug('connecting to LCD')
+        self.lcd.connect()
+        self.logger.debug('setting autoscroll to False')
+        self.lcd.set_autoscroll(False)
+        self.logger.debug('setting brightness to 255 ')
+        self.lcd.set_brightness(255)
+
         if alert:
+            self.logger.debug('message was an alert, setting backlight to (255,0,0)')
             self.lcd.set_backlight_rgb(255,0,0)
 
         else:
+            self.logger.debug('message was not an alert, setting backlight to (255,255,0)')
             self.lcd.set_backlight_rgb(255,255,0)
-
+    
+        self.logger.debug('clearing LCD')
         self.lcd.clear()
+        self.logger.debug('setting cursor to (1,1)')
         self.lcd.set_cursor_position(1,1)
-        self.lcd.write(self.buffer[0])
+        self.logger.debug('writting self.buffer[%s]' % (buffer_index[0]))
+        self.lcd.write(self.buffer[buffer_index[0]])
+        self.logger.debug('setting cursor to (1,2)')
         self.lcd.set_cursor_position(1,2)
-        self.lcd.write(self.buffer[1])
+        self.logger.debug('writting self.buffer[%s]' % (buffer_index[1]))
+        self.lcd.write(self.buffer[buffer_index[1]])
 
+        self.logger.debug('disconnecting from LCD')
         self.lcd.disconnect()
-
-
 
 if __name__ == '__main__':
     handler = Handler()
+
 
