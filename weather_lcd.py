@@ -60,7 +60,7 @@ class Handler():
 
         self.logger.debug('======== NEW INSTANCE ========')
 
-        self.display_msg('updating...')
+        self.display_msg('waiting...')
 
         while True:
 
@@ -364,6 +364,8 @@ class Handler():
 
     def display_msg(self, line_one='', line_two='', alert=False, buffer_index=[0,1]):
 
+        # Keep this up here so it doesn't set the buffers
+
         self.logger.debug('doing some buffer stuff')
         # format it a little
         line_one = str(line_one)[:16]
@@ -414,7 +416,11 @@ class Handler():
         self.lcd.set_cursor_position(1,1)
         self.logger.debug('writting self.buffer[%s]' % (buffer_index[0]))
 
-        if self.lcd.connected and self.in_use == False:
+        if self.in_use:
+            self.logger.debug('LCD in use, returning')
+            return 
+
+        if self.lcd.connected:
             self.in_use = True
             self.lcd.write(self.buffer[buffer_index[0]])
             self.logger.debug('setting cursor to (1,2)')
