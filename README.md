@@ -11,8 +11,7 @@ Features:
 - supports MQTT, so you can use this to display arbitrary messages. (You'll have to setup a MQTT server though)
 
 
-Notes:
-I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting. 
+
 
 Installation:
 ```git clone https://github.com/Cightline/mqtt_lcd.git
@@ -21,4 +20,10 @@ cp mqtt_lcd/* /etc/mqtt_lcd/
 cp mqtt_lcd.service /usr/lib/systemd/system/mqtt_lcd.service
 pip install lcdbackpack
 pip install timeout-decorator
-systemctl enable mqtt_lcd```
+systemctl enable mqtt_lcd
+```
+
+
+
+Notes:
+I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting.
