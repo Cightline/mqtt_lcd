@@ -15,9 +15,9 @@ Notes:
 I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting. 
 
 Installation:
-```git clone [repo]
+```git clone https://github.com/Cightline/mqtt_lcd.git
 mkdir /etc/mqtt_lcd
-cp [repo_path]/* /etc/mqtt_lcd/
+cp mqtt_lcd/* /etc/mqtt_lcd/
 cp mqtt_lcd.service /usr/lib/systemd/system/mqtt_lcd.service
 pip install lcdbackpack
 pip install timeout-decorator
