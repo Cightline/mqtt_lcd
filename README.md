@@ -26,4 +26,5 @@ systemctl enable mqtt_lcd
 
 
 Notes:
+
 I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting.
