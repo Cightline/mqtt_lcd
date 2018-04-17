@@ -14,6 +14,7 @@ from math import radians, cos, sin, asin, sqrt
 
 import paho.mqtt.client as mqtt
 from lcdbackpack import LcdBackpack
+import timeout_decorator
 
 class Handler():
     def __init__(self):
@@ -30,6 +31,7 @@ class Handler():
         self.c                 = None
         self.d                 = None
         self.in_use            = False
+        self.update_interval   = self.config['update_interval']
 
         self.temp      = 'n/a'
         self.condition = 'n/a'
@@ -60,25 +62,30 @@ class Handler():
 
         self.logger.debug('======== NEW INSTANCE ========')
 
+        self.client.connect(host=self.config['host'], port=self.config['port'])
+
+        self.client.loop_start()
+
         self.display_msg('waiting...')
 
         while True:
 
-            if not self.connected:
-                self.client.connect(host=self.config['host'], port=self.config['port'])
-            
-            self.client.loop_start()
+            if self.connected == False:
 
-            #self.logger.debug('iterating self.display_loop()')
+                try:
+                    self.client.reconnect()
+
+                except Exception as e:
+                    self.error(e)
+                    time.sleep(3)
+
             
             now = datetime.datetime.utcnow()
-            #print(self.buffer)
+
             try: 
-                #raise Exception('test')
-                #self.display_msg('test', 'fuck', alert=False, buffer_index=[2,3])
                 if self.c == None:
                     self.c = now
-                    time_diff_c = 120
+                    time_diff_c = self.update_interval
 
                 else:
                     time_diff_c = ((now - self.c).seconds)
@@ -95,8 +102,7 @@ class Handler():
                 # Grab the alerts first
                 
                 #print('time_diff_c', time_diff_c, 'time_diff_d', time_diff_d)
-                if time_diff_c >= 120:
-                    #self.get_alerts()
+                if time_diff_c >= self.update_interval: self.get_alerts()
                     self.get_weather()
                     self.get_hourly()
                     
@@ -108,10 +114,12 @@ class Handler():
                     time.sleep(1)
 
             except Exception as e:
-                self.logger.debug('EXCEPTION: %s' % (e))
-                self.display_msg('unknown', 'error')
+                self.error(e)
 
-
+    
+    def error(self, msg):
+        self.logger.debug('EXCEPTION: %s' % (msg))
+        self.display_msg('exception')
 
 
     def on_connect(self, client, userdata, flags, rc):
@@ -187,7 +195,7 @@ class Handler():
 
         #print(d)
 
-        self.temp      = d['temp_f']
+        self.temp      = int(d['temp_f'])
         self.condition = d['weather']
         self.wind      = d['wind_mph']
 
@@ -330,9 +338,17 @@ class Handler():
             else:
                 line_one = '/'.join(self.current_alerts)
 
+                # Add temp if possible
+                if len(self.current_alerts) <= 3:
+                    line_one = '%s %s' % (self.temp, line_one)
+                
+
+    
+                # Display storm distance
                 if self.storm_distance != -1:
                     self.display_msg(line_one, '%s miles out' % (self.storm_distance), alert=True)
-    
+               
+
                 else:
                     self.display_msg(line_one, self.condition, alert=True)
 
@@ -360,9 +376,14 @@ class Handler():
 
         self.display_msg(line_one, self.condition)
 
-
-
     def display_msg(self, line_one='', line_two='', alert=False, buffer_index=[0,1]):
+        try:
+            self.write_buffer(line_one, line_two, alert=alert, buffer_index=buffer_index)
+        except Exception as e:
+            self.error(e)
+
+    @timeout_decorator.timeout(5, use_signals=False)
+    def write_buffer(self, line_one='', line_two='', alert=False, buffer_index=[0,1]):
 
         # Keep this up here so it doesn't set the buffers
 
@@ -390,10 +411,7 @@ class Handler():
 
         if self.buffer[buffer_index[1]] != line_two:
             self.buffer[buffer_index[1]] = line_two
-
-        self.current_buffer[0] = line_one
-        self.current_buffer[1] = line_two
-       
+        
         self.logger.debug('connecting to LCD')
         self.lcd.connect()
         self.logger.debug('setting autoscroll to False')
@@ -415,6 +433,10 @@ class Handler():
         self.logger.debug('setting cursor to (1,1)')
         self.lcd.set_cursor_position(1,1)
         self.logger.debug('writting self.buffer[%s]' % (buffer_index[0]))
+
+        self.current_buffer[0] = line_one
+        self.current_buffer[1] = line_two
+       
 
         if self.in_use:
             self.logger.debug('LCD in use, returning')

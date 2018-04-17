@@ -7,13 +7,10 @@ User=admin
 Group=admin
 WorkingDirectory=/home/admin/mqtt_lcd
 PIDFile=/var/run/mqtt_lcd.pid
-ExecStart=/home/admin/mqtt_lcd/main_tft.py
+ExecStart=/home/admin/mqtt_lcd/weather_lcd.py
 ExecStop=/bin/kill -INT $MAINPID
 OOMScoreAdjust=-100
 TimeoutStopSec=10s
-StandardInput=tty
-StandardOutput=tty
-TTYPath=/dev/tty2
 
 [Install]
 WantedBy=multi-user.target

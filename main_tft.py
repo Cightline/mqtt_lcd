@@ -6,6 +6,7 @@ import datetime
 import threading
 import copy
 import logging
+import subprocess
 
 from cStringIO import StringIO
 from io import BytesIO
@@ -22,6 +23,16 @@ current_screen = 0
 #from lcdbackpack import LcdBackpack
 
 os.nice(100)
+os.putenv('SDL_FBDEV', '/dev/fb1')
+#os.putenv('SDL_VIDEODRIVER', 'directfb')
+
+disable_blink = subprocess.check_output(['echo', '0', '>', '/sys/class/graphics/fbcon/cursor_blink'])
+disable_blank = subprocess.check_output(['setterm', '--blank', '0'])
+
+print('disable_blink: %s' % (disable_blink))
+print('disable_blank: %s' % (disable_blank))
+
+
 
 class EventHandler(threading.Thread):
     def __init__(self):
@@ -66,7 +77,7 @@ class EventHandler(threading.Thread):
 
         #print('time_diff', time_diff)
 
-        if time_diff <= 2:
+        if time_diff <= 1:
             #print('time_diff < 2')
             hold_diff = ((now - self.hold_timer).seconds)
             #print('hold_diff: %s' % (hold_diff))
@@ -112,15 +123,15 @@ class EventHandler(threading.Thread):
 class Handler():
     def __init__(self):
         
-        os.putenv('SDL_FBDEV', '/dev/fb1')
-        os.putenv('SDL_VIDEODRIVER', 'fbcon')
+        #os.putenv('SDL_VIDEODRIVER', 'fbcon')
 
         pygame.display.init()
         pygame.font.init()
         pygame.mouse.set_visible(False)
 
         self.size   = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-        self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN | pygame.DOUBLEBUF)
+        self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN)
+        #self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN | pygame.DOUBLEBUF | pygame.HWSURFACE)
 
 
         self.font = pygame.font.Font(None, 30)
@@ -199,7 +210,7 @@ class Handler():
 
         while True:
             self.update_display()
-            time.sleep(.5)
+            pygame.display.flip()
     
     def load_config(self):
         with open(self.config_path, 'r') as cfg:
@@ -315,7 +326,7 @@ class Handler():
                     fontname=self.font_name,
                     width=self.font_width)
             
-            pygame.display.update()
+            #pygame.display.flip()
             return 
 
 
@@ -357,7 +368,7 @@ class Handler():
             to_display = pygame.transform.scale(to_display, (self.size[0], self.size[1]))
 
             self.screen.blit(to_display, (0, 0))
-            pygame.display.update()
+            #pygame.display.flip()
             return True
 
         except:
@@ -395,12 +406,12 @@ class Handler():
 
             except Exception as e:
                 self.display_error('unable to download radar image')
-                time.sleep(self.error_delay)
+                #time.sleep(self.error_delay)
                 return
 
             if ir.status_code != 200:
                 self.display_error('unable to download radar image')
-                time.sleep(self.error_delay)
+                #time.sleep(self.error_delay)
                 return 
             
             
@@ -444,7 +455,7 @@ class Handler():
                        width=self.font_width)
 
 
-        pygame.display.update()
+        #pygame.display.flip()
 
 
 if __name__ == '__main__':

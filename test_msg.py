@@ -1,5 +1,6 @@
 import os
 import json
+import time
 
 
 
@@ -32,8 +33,9 @@ client.connect(config['host'], config['port'])
 
 client.loop_start()
 
-infot = client.publish('pi', json.dumps({'line_one':'fuck', 'line_two':'bitches'}), qos=2)
+for x in range(10):
+    infot = client.publish('pi', json.dumps({'line_one':'test', 'line_two':x}), qos=2)
 
-infot.wait_for_publish()
+    infot.wait_for_publish()
 
 print('Done')
