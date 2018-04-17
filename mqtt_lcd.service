@@ -1,13 +1,13 @@
 [Unit]
-Description=MQTT LCD 
+Description=MQTT/weather LCD 
 
 [Service]
 Type=simple
 User=admin
 Group=admin
-WorkingDirectory=/home/admin/mqtt_lcd
+WorkingDirectory=/etc/mqtt_lcd
 PIDFile=/var/run/mqtt_lcd.pid
-ExecStart=/home/admin/mqtt_lcd/weather_lcd.py
+ExecStart=/etc/mqtt_lcd/weather_lcd.py
 ExecStop=/bin/kill -INT $MAINPID
 OOMScoreAdjust=-100
 TimeoutStopSec=10s

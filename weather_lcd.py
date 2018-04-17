@@ -12,13 +12,16 @@ import requests
 
 from math import radians, cos, sin, asin, sqrt
 
-import paho.mqtt.client as mqtt
 from lcdbackpack import LcdBackpack
+
+# I'm not sure if its my soldering job, or the LCD itself, but I had to use this as 
+# the LCD would freeze after a while. 
+# https://github.com/pnpnpn/timeout-decorator
 import timeout_decorator
 
 class Handler():
     def __init__(self):
-        self.config_path = os.path.expanduser('~/.config/mqtt/lcd.json')
+        self.config_path = os.path.expanduser('/etc/mqtt_lcd/lcd.json')
         self.config      = self.load_config()
         self.msg_queue   = []
         self.buffer      = [''] * 4
@@ -32,20 +35,15 @@ class Handler():
         self.d                 = None
         self.in_use            = False
         self.update_interval   = self.config['update_interval']
+        self.enable_mqtt       = self.config['enable_mqtt']
+        self.normal_color      = self.config['normal_color']
+        self.alert_color       = self.config['alert_color']
 
         self.temp      = 'n/a'
         self.condition = 'n/a'
         self.wind      = 'n/a'
 
-        self.client = mqtt.Client()
         
-        self.client.on_connect    = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_message    = self.on_message
-
-        self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
-        self.client.tls_set()
-
         self.lcd = LcdBackpack(self.config['dev'], self.config['baud'])
 
         self.logger = logging.getLogger(__name__)
@@ -62,16 +60,18 @@ class Handler():
 
         self.logger.debug('======== NEW INSTANCE ========')
 
-        self.client.connect(host=self.config['host'], port=self.config['port'])
+        if self.enable_mqtt == True:
+            self.display_msg('MQTT enabled')
+            self.init_mqtt()
+            time.sleep(2)
 
-        self.client.loop_start()
 
-        self.display_msg('waiting...')
+        else:
+            self.display_msg('MQTT disabled')
 
         while True:
 
-            if self.connected == False:
-
+            if self.connected == False and self.enable_mqtt == True:
                 try:
                     self.client.reconnect()
 
@@ -102,7 +102,8 @@ class Handler():
                 # Grab the alerts first
                 
                 #print('time_diff_c', time_diff_c, 'time_diff_d', time_diff_d)
-                if time_diff_c >= self.update_interval: self.get_alerts()
+                if time_diff_c >= self.update_interval: 
+                    self.get_alerts()
                     self.get_weather()
                     self.get_hourly()
                     
@@ -115,6 +116,25 @@ class Handler():
 
             except Exception as e:
                 self.error(e)
+
+
+    def init_mqtt(self):
+        import paho.mqtt.client as mqtt
+        self.client = mqtt.Client()
+
+
+        self.client.on_connect    = self.on_connect
+        self.client.on_disconnect = self.on_disconnect
+        self.client.on_message    = self.on_message
+
+        self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
+        self.client.tls_set()
+
+        self.client.connect(host=self.config['host'], port=self.config['port'])
+
+        self.client.loop_start()
+
+
 
     
     def error(self, msg):
@@ -422,11 +442,11 @@ class Handler():
 
         if alert:
             self.logger.debug('message was an alert, setting backlight to (255,0,0)')
-            self.lcd.set_backlight_rgb(255,0,0)
+            self.lcd.set_backlight_rgb(self.alert_color[0], self.alert_color[1], self.alert_color[2])
 
         else:
             self.logger.debug('message was not an alert, setting backlight to (255,255,0)')
-            self.lcd.set_backlight_rgb(255,255,0)
+            self.lcd.set_backlight_rgb(self.normal_color[0], self.normal_color[1], self.normal_color[2])
     
         self.logger.debug('clearing LCD')
         self.lcd.clear()
