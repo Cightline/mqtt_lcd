@@ -1,5 +1,5 @@
 # mqtt_lcd
-Code for my Raspberry Pi LCD MQTT LCD  
+Code for my Raspberry Pi weather/MQTT LCD  
 
 This program was made for the 16x2 character LCD from Adafruit (https://www.adafruit.com/product/782).
 
