@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 import json
 import os
 import time
@@ -35,7 +35,6 @@ class Handler():
         self.d                 = None
         self.in_use            = False
         self.update_interval   = self.config['update_interval']
-        self.enable_mqtt       = self.config['enable_mqtt']
         self.normal_color      = self.config['normal_color']
         self.alert_color       = self.config['alert_color']
 
@@ -60,26 +59,8 @@ class Handler():
 
         self.logger.debug('======== NEW INSTANCE ========')
 
-        if self.enable_mqtt == True:
-            self.display_msg('MQTT enabled')
-            self.init_mqtt()
-            time.sleep(2)
-
-
-        else:
-            self.display_msg('MQTT disabled')
 
         while True:
-
-            if self.connected == False and self.enable_mqtt == True:
-                try:
-                    self.client.reconnect()
-
-                except Exception as e:
-                    self.error(e)
-                    time.sleep(3)
-
-            
             now = datetime.datetime.utcnow()
 
             try: 
@@ -89,19 +70,7 @@ class Handler():
 
                 else:
                     time_diff_c = ((now - self.c).seconds)
-
-                if self.d == None:
-                    self.d = now
-                    time_diff_d = 0
-
-                else:
-                    time_diff_d = ((now - self.d).seconds)
-
-                #print('time diff: %s' % (time_diff))
     
-                # Grab the alerts first
-                
-                #print('time_diff_c', time_diff_c, 'time_diff_d', time_diff_d)
                 if time_diff_c >= self.update_interval: 
                     self.get_alerts()
                     self.get_weather()
@@ -110,30 +79,9 @@ class Handler():
                     self.display_info()
                     self.c = now
                
-                elif time_diff_d >= 10:
-                    self.display_info()
-                    time.sleep(1)
 
             except Exception as e:
                 self.error(e)
-
-
-    def init_mqtt(self):
-        import paho.mqtt.client as mqtt
-        self.client = mqtt.Client()
-
-
-        self.client.on_connect    = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_message    = self.on_message
-
-        self.client.username_pw_set(username=self.config['username'], password=self.config['password'])
-        self.client.tls_set()
-
-        self.client.connect(host=self.config['host'], port=self.config['port'])
-
-        self.client.loop_start()
-
 
 
     
@@ -142,49 +90,6 @@ class Handler():
         self.display_msg('exception')
 
 
-    def on_connect(self, client, userdata, flags, rc):
-        if rc != 0:
-            self.logger.warn('Unable to connect: code [%s]' % (rc))
-            self.display_msg('error', 'cant connect')
-            self.logger.info("can't connect, code [%s]" % (rc))
-
-        self.display_msg('connected', '')
-        self.logger.info('connected')
-        print('connected with result code: %s' % (rc))
-
-        self.client.subscribe('pi/#')
-        self.connected = True
-
-
-
-    def on_disconnect(self, client, userdata, rc):
-        self.logger.info('disconnected: code [%s]' % (rc))
-        self.display_msg('disconnected', '')
-        self.connected = False
-
-
-    def on_message(self, client, userdata, msg):
-        print('%s %s' % (msg.topic, msg.payload))
-
-        keys = ['line_one', 'line_two']
-
-        try:
-            m = json.loads(msg.payload)
-        except Exception as e:
-            self.logger.warn('unable to decode JSON from MQTT: %s' % (e))
-
-        for key in keys:
-            if key not in m:
-                self.logger.info('JSON from MQTT is malformed: %s' % (m))
-                return 
-
-        line_one = m['line_one']
-        line_two = m['line_two']
-
-        if not self.current_alerts:
-            self.d = datetime.datetime.utcnow()
-            self.display_msg(line_one, line_two, alert=False, buffer_index=[2,3])
-       
     def get_page(self, url):
         page = requests.get(url)
 
@@ -396,9 +301,26 @@ class Handler():
 
         self.display_msg(line_one, self.condition)
 
+        
     def display_msg(self, line_one='', line_two='', alert=False, buffer_index=[0,1]):
+        r = False
+
         try:
-            self.write_buffer(line_one, line_two, alert=alert, buffer_index=buffer_index)
+            line_one = str(line_one)[:16]
+            line_two = str(line_two)[:16]
+
+            if self.current_buffer[0] != line_one and self.current_buffer[1] != line_two:
+                r = self.write_buffer(line_one, line_two, alert=alert, buffer_index=buffer_index)
+
+            else:
+                #self.logger.debug('message already displayed, returning')
+                return 
+
+            # I think the timeout_decorator is messing with stuff, my list assignments aren't being saved. 
+            if r == True:
+                self.current_buffer[0] = line_one
+                self.current_buffer[1] = line_two
+
         except Exception as e:
             self.error(e)
 
@@ -408,29 +330,21 @@ class Handler():
         # Keep this up here so it doesn't set the buffers
 
         self.logger.debug('doing some buffer stuff')
-        # format it a little
-        line_one = str(line_one)[:16]
-        line_two = str(line_two)[:16]
 
         #msg[0] = ('{{0: <{}}}'.format(16).format(title))
 
-       
         # don't redisplay the same message
         '''if self.buffer[buffer_index[0]] == line_one and self.buffer[buffer_index[1]] == line_two:
             self.logger.debug('message alerady displayed, returning')
             return '''
 
-
-        if self.current_buffer[0] == line_one and self.current_buffer[1] == line_two:
-            self.logger.debug('message already displayed, returning')
-            return 
-
-        if self.buffer[buffer_index[0]] != line_one:
+        
+        '''if self.buffer[buffer_index[0]] != line_one:
             self.buffer[buffer_index[0]] = line_one
 
 
         if self.buffer[buffer_index[1]] != line_two:
-            self.buffer[buffer_index[1]] = line_two
+            self.buffer[buffer_index[1]] = line_two'''
         
         self.logger.debug('connecting to LCD')
         self.lcd.connect()
@@ -447,35 +361,44 @@ class Handler():
         else:
             self.logger.debug('message was not an alert, setting backlight to (255,255,0)')
             self.lcd.set_backlight_rgb(self.normal_color[0], self.normal_color[1], self.normal_color[2])
-    
-        self.logger.debug('clearing LCD')
-        self.lcd.clear()
-        self.logger.debug('setting cursor to (1,1)')
-        self.lcd.set_cursor_position(1,1)
-        self.logger.debug('writting self.buffer[%s]' % (buffer_index[0]))
-
-        self.current_buffer[0] = line_one
-        self.current_buffer[1] = line_two
-       
+   
 
         if self.in_use:
             self.logger.debug('LCD in use, returning')
-            return 
+            return False
 
         if self.lcd.connected:
             self.in_use = True
-            self.lcd.write(self.buffer[buffer_index[0]])
+
+            self.logger.debug('2 %s' % (self.current_buffer))
+
+            self.logger.debug('clearing LCD')
+            self.lcd.clear()
+            self.logger.debug('setting cursor to (1,1)')
+            self.lcd.set_cursor_position(1,1)
+            self.logger.debug('writting line_one: %s' % (line_one))
+            self.lcd.write(line_one)
             self.logger.debug('setting cursor to (1,2)')
             self.lcd.set_cursor_position(1,2)
-            self.logger.debug('writting self.buffer[%s]' % (buffer_index[1]))
-            self.lcd.write(self.buffer[buffer_index[1]])
+            self.logger.debug('writting line_two: %s' % (line_two))
+            self.lcd.write(line_two)
 
             self.logger.debug('disconnecting from LCD')
             self.lcd.disconnect()
+
+            self.current_buffer[0] = copy.deepcopy(line_one)
+            self.current_buffer[1] = copy.deepcopy(line_two)
+
             self.in_use = False
 
+            self.logger.debug('3 %s' % (self.current_buffer))
+            self.logger.debug('line_one: %s' % (line_one))
+            self.logger.debug('line_two: %s' % (line_two))
         else:
             self.logger.warn('LCD not connected, returning')
+            return False
+
+        return True
 
 if __name__ == '__main__':
     handler = Handler()
