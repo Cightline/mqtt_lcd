@@ -1,8 +1,0 @@
-{
-    "username":"pi",
-    "password":"some_long_password",
-    "host":"mqtt.host",
-    "port":8883,
-    "delay":10,
-    "message_exp":20
-}

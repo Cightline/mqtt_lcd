@@ -1,4 +1,0 @@
-cp mqtt_lcd.service /usr/lib/systemd/system/
-chmod +x /home/admin/mqtt_lcd/main.py
-systemctl enable mqtt_lcd
-systemctl start mqtt_lcd
