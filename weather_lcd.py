@@ -37,6 +37,7 @@ class Handler():
         self.update_interval   = self.config['update_interval']
         self.normal_color      = self.config['normal_color']
         self.alert_color       = self.config['alert_color']
+        self.alerts_ignore     = self.config['alerts_ignore']
 
         self.temp      = 'n/a'
         self.condition = 'n/a'
@@ -61,6 +62,7 @@ class Handler():
 
 
         while True:
+            self.logger.debug('looping')
             now = datetime.datetime.utcnow()
 
             try: 
@@ -70,6 +72,8 @@ class Handler():
 
                 else:
                     time_diff_c = ((now - self.c).seconds)
+
+                self.logger.debug('time_diff_c: %s' % (time_diff_c))
     
                 if time_diff_c >= self.update_interval: 
                     self.get_alerts()
@@ -83,11 +87,11 @@ class Handler():
             except Exception as e:
                 self.error(e)
 
-
+            time.sleep(1)
     
     def error(self, msg):
-        self.logger.debug('EXCEPTION: %s' % (msg))
-        self.display_msg('exception')
+        self.logger.error('EXCEPTION: %s' % (msg))
+        #self.display_msg('exception')
 
 
     def get_page(self, url):
@@ -118,11 +122,10 @@ class Handler():
             self.display_msg('unable to get', 'weather')
             return False
 
-        #print(d)
-
         self.temp      = int(d['temp_f'])
         self.condition = d['weather']
         self.wind      = d['wind_mph']
+
 
     
     # https://stackoverflow.com/questions/15736995/how-can-i-quickly-estimate-the-distance-between-two-latitude-longitude-points?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
@@ -188,7 +191,7 @@ class Handler():
             self.rain_hour = -1
     
         if not thunderstorm_set:
-            self.thunderstorm_set = -1
+            self.thunderstorm_hour = -1
 
    
     def get_alerts(self):
@@ -205,6 +208,11 @@ class Handler():
             alert = copy.deepcopy(d[x])
             
             #print(alert['type'])
+
+            if alert["description"] in self.alerts_ignore:
+                self.logger.debug('ignoring alert: %s' % (alert['description']))
+                continue 
+
             self.current_alerts.append(alert['type'])
 
             for word in alert['message'].split(' '):
@@ -289,15 +297,15 @@ class Handler():
         #print('T HOUR', self.thunderstorm_hour)
         # rain and thunderstorm
         if self.rain_hour != -1 and self.thunderstorm_hour != -1:
-            line_one = '%s R: %s T:%s' % (self.temp, self.rain_hour, self.thunderstorm_hour)
+            line_one = '%s R:%s T:%s' % (self.temp, self.rain_hour, self.thunderstorm_hour)
 
         # rain, no thunderstorm
         elif self.rain_hour != -1 and self.thunderstorm_hour == -1:
-            line_one = '%s R: %s' % (self.temp, self.rain_hour)
+            line_one = '%s R:%s' % (self.temp, self.rain_hour)
         
         # no rain, just thunderstorm
         elif self.rain_hour == -1 and self.thunderstorm_hour != -1:
-            line_one = '%s      T: %s ' % (self.temp, self.thunderstorm_hour)
+            line_one = '%s      T:%s ' % (self.temp, self.thunderstorm_hour)
 
         self.display_msg(line_one, self.condition)
 
@@ -309,17 +317,23 @@ class Handler():
             line_one = str(line_one)[:16]
             line_two = str(line_two)[:16]
 
-            if self.current_buffer[0] != line_one and self.current_buffer[1] != line_two:
+            if self.current_buffer[0] != line_one or self.current_buffer[1] != line_two:
                 r = self.write_buffer(line_one, line_two, alert=alert, buffer_index=buffer_index)
 
             else:
-                #self.logger.debug('message already displayed, returning')
+                self.logger.debug('message already displayed, returning')
+                self.logger.debug('line_one: %s' % line_one)
+                self.logger.debug('line_two: %s' % line_two)
+                self.logger.debug('self.current_buffer[0]: %s' % self.current_buffer[0])
+                self.logger.debug('self.current_buffer[1]: %s' % self.current_buffer[1])
                 return 
 
             # I think the timeout_decorator is messing with stuff, my list assignments aren't being saved. 
             if r == True:
                 self.current_buffer[0] = line_one
-                self.current_buffer[1] = line_two
+                self.current_buffer[1] = line_two 
+            else:
+                self.error('something happened')
 
         except Exception as e:
             self.error(e)
