@@ -13,7 +13,7 @@ Features:
 
 
 
-Installation:
+## Installation:
 ```git clone https://github.com/Cightline/weather_lcd.git
 pip install lcdbackpack
 pip install timeout-decorator
@@ -50,6 +50,6 @@ systemctl start weather_lcd
 ```
 
 
-Notes:
+## Notes:
 
 I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting after running for 6+ hours. 
