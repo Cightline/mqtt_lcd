@@ -1,5 +1,7 @@
 # Weather LCD
-Code for my Raspberry Pi Weather LCD (operating system is here: https://archlinuxarm.org/platforms/armv6/raspberry-pi)
+[arbitrary case-insensitive reference text]: https://www.mozilla.org
+Code for my Raspberry Pi Weather LCD.
+([OS](https://archlinuxarm.org/platforms/armv6/raspberry-pi))
 
 This program was made for the 16x2 character LCD from Adafruit (https://www.adafruit.com/product/782), however it shouldn't be difficult to use with other character LCD screens. Raise an issue if you'd like to do so. 
 
@@ -14,6 +16,7 @@ This program was made for the 16x2 character LCD from Adafruit (https://www.adaf
 
 
 ### Installation:
+------
 ```git clone https://github.com/Cightline/weather_lcd.git
 pip install lcdbackpack
 pip install timeout-decorator
@@ -54,5 +57,6 @@ systemctl start weather_lcd
 
 
 #### Notes:
+------
 
 I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting after running for 6+ hours. 
