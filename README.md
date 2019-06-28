@@ -5,8 +5,8 @@ This program was made for the 16x2 character LCD from Adafruit (https://www.adaf
 
 Features:
 - Uses data from the NOAA, so no API key is needed. 
-- displays the local weather and conditions.
-- displays weather alerts (conditions are still displayed if the the alerts don't take up the entire LCD).
+- Displays the local weather and conditions.
+- Displays weather alerts (conditions are still displayed if the the alerts don't take up the entire LCD).
 - Weather alerts will cause the color of the LCD to flip red (alert color is customizable)
 
 
