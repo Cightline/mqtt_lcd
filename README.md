@@ -3,7 +3,7 @@ Code for my Raspberry Pi Weather LCD
 
 This program was made for the 16x2 character LCD from Adafruit (https://www.adafruit.com/product/782), however it shouldn't be difficult to use with other character LCD screens. Raise an issue if you'd like to do so. 
 
-Features:
+### Features:
 - Uses data from the NOAA, so no API key is needed. 
 - Displays the local weather and conditions.
 - Displays weather alerts (conditions are still displayed if the the alerts don't take up the entire LCD).
@@ -13,7 +13,7 @@ Features:
 
 
 
-## Installation:
+### Installation:
 ```git clone https://github.com/Cightline/weather_lcd.git
 pip install lcdbackpack
 pip install timeout-decorator
@@ -50,6 +50,6 @@ systemctl start weather_lcd
 ```
 
 
-## Notes:
+#### Notes:
 
 I'm not really sure if I didn't do a good job soldering or what, but I had to use a timeout library. The LCD would freeze/block while connecting after running for 6+ hours. 
