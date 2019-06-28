@@ -1,7 +1,7 @@
 # Weather LCD
 Code for my Raspberry Pi Weather LCD  
 
-This program was made for the 16x2 character LCD from Adafruit (https://www.adafruit.com/product/782).
+This program was made for the 16x2 character LCD from Adafruit (https://www.adafruit.com/product/782), however it shouldn't be difficult to use with other character LCD screens. Raise an issue if you'd like to do so. 
 
 Features:
 - Uses data from the NOAA, so no API key is needed. 
