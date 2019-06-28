@@ -41,7 +41,10 @@ Reload the rules: `udevadm control --reload-rules`
 You should now be able to run `echo "test" > /dev/serial/by-id/usb-239a_Adafruit_Industries-if00`
 
 Open `weather_lcd.service` and make the `WorkingDirectory=`,`ExecStart=`,`User=`, and `Group=` variables are correct, then install the service file with:
-`cp weather_lcd.service /usr/lib/systemd/system/weather_lcd.service` 
+
+```
+cp weather_lcd.service /usr/lib/systemd/system/weather_lcd.service
+``` 
 
 Start and enable the systemd service. 
 ```
