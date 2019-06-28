@@ -1,0 +1,12 @@
+{
+    "delay":10,
+    "dev":"/dev/serial/by-id/usb-239a_Adafruit_Industries-if00",
+    "baud":115200,
+    "row_characters":16,
+    "lat": 31.40293,
+    "lon": -94.2399,
+    "update_interval":500,
+    "alert_color":[255,0,0],
+    "normal_color":[255,255,255],
+    "alerts_ignore":["Air Quality Alert"]
+}

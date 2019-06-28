@@ -21,8 +21,14 @@ from noaa_sdk    import noaa
 # https://github.com/pnpnpn/timeout-decorator
 
 class Handler():
-    def __init__(self):
-        self.config_path = os.path.expanduser('/etc/mqtt_lcd/lcd.json')
+    def __init__(self, args):
+
+        if args.config:
+            self.config_path = os.path.expanduser(args.config)
+
+        else:
+            self.config_path = os.path.expanduser('~/.config/weather_lcd/config.json')
+
         self.config      = self.load_config()
         self.msg_queue   = []
         self.buffer      = [''] * 4
@@ -50,7 +56,12 @@ class Handler():
         self.wind      = 'n/a'
 
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
+
+        if args.debug:
+            self.logger.setLevel(logging.DEBUG)
+
+        else:
+            self.logger.setLevel(logging.INFO)
 
 
         while self.setup == False:
@@ -71,14 +82,20 @@ class Handler():
         
         self.lcd = LcdBackpack(self.config['dev'], self.config['baud'])
 
-        fh = logging.FileHandler(self.config['log_path'])
-        fh.setLevel(logging.DEBUG)
-        
+        #fh = logging.FileHandler(self.config['log_path'])
+        #fh.setLevel(logging.DEBUG)
+       
+        sh = logging.StreamHandler()
+
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
-        fh.setFormatter(formatter)
+        #fh.setFormatter(formatter)
+        sh.setFormatter(formatter)
 
-        self.logger.addHandler(fh) 
+        #self.logger.setFormatter(formatter)
+
+        #self.logger.addHandler(fh) 
+        self.logger.addHandler(sh) 
 
 
         self.logger.debug('======== NEW INSTANCE ========')
@@ -465,6 +482,16 @@ class Handler():
         return True
 
 if __name__ == '__main__':
-    handler = Handler()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--debug',  action='store_true', default=False, help='Set the logger to DEBUG')
+    parser.add_argument('--config', action='store',                     help='Set the configuration path')
+
+    args = parser.parse_args()
+
+    handler = Handler(args=args)
+    
 
 

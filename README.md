@@ -24,6 +24,11 @@ systemctl enable mqtt_lcd
 ```
 
 
+```
+udevadm info -a -p $(udevadm info -q path -n /dev/serial/by-id/usb-239a_Adafruit_Industries-if00)
+```
+
+
 
 Notes:
 
