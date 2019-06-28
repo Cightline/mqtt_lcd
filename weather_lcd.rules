@@ -1,1 +1,1 @@
-ACTION=="add", ATTRS{idProduct}=="0001", ATTRS{idVendor}=="239a", DRIVERS=="usb", GROUP="lcd", MODE="0775"
+ACTION=="add", ATTRS{idVendor}=="239a", ATTRS{idProduct}=="0001", DRIVERS=="usb", GROUP="lcd", MODE="0775"
